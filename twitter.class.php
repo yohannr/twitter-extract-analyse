@@ -1,5 +1,9 @@
 <?php
 
+/*
+ * More information on Twitter API : https://dev.twitter.com/docs/api/1.1
+*/
+
 require_once('twitteroauth/twitteroauth.php');
 
 class Twitter
@@ -32,7 +36,8 @@ class Twitter
 
 
 	/*
-	 * Return the last tweets of an account
+	 * Return the last (10) tweets of an account
+	 * https://dev.twitter.com/docs/api/1.1/get/statuses/user_timeline
 	*/
 	public function statusesUserTimeline($account, $nbOfTweet = 10)
 	{
@@ -47,7 +52,7 @@ class Twitter
 
 		$i = 0;
 		foreach ($content as $tweet) {
-			$arr_tweets[$i]['created_at'] = $tweet->created_at;
+			$arr_tweets[$i]['created_at'] = $this->twitterDateToTimestamp($tweet->created_at);
 			$arr_tweets[$i]['id_str'] = $tweet->id_str;
 			$arr_tweets[$i]['text'] = $tweet->text;
 			$arr_tweets[$i]['retweet_count'] = $tweet->retweet_count;
@@ -66,6 +71,7 @@ class Twitter
 
 
 	/*
+	 * Get information about an account
 	 * https://dev.twitter.com/docs/api/1.1/get/users/lookup
 	*/
 	public function usersLookup($id)
@@ -81,29 +87,31 @@ class Twitter
 
 		try {
 			$query = 'https://api.twitter.com/1.1/users/lookup.json?user_id=';
-			$fullquery = $query.$id;
+			$fullquery = $query.$id.'&include_entities=false';
 			$content = $connection->get($fullquery);
+
+			$arr_friend['id'] = (int)$content[0]->id_str;
+			$arr_friend['name'] = $content[0]->name;
+			$arr_friend['screen_name'] = $content[0]->screen_name;
+			$arr_friend['location'] = $content[0]->location;
+			$arr_friend['url'] = $content[0]->url;
+			$arr_friend['description'] = $content[0]->description;
+			$arr_friend['followers_count'] = $content[0]->followers_count;
+			$arr_friend['friends_count'] = $content[0]->friends_count;
+			$arr_friend['listed_count'] = $content[0]->listed_count;
+			$arr_friend['favourites_count'] = $content[0]->favourites_count;
+			$arr_friend['lang'] = $content[0]->lang;
+			$arr_friend['profile_image_url'] = $content[0]->profile_image_url;
+			$arr_friend['following'] = $content[0]->following;
+			$arr_friend['last_tweet'] = $this->twitterDateToTimestamp($content[0]->status->created_at);
+
+		unset($connection);
 		} catch (Exception $e) {
 			echo 'Error usersLookup : '.$e->getMessage();
 			exit;
 		}
 
-		$arr_friend['id_str'] = $content[0]->id_str;
-		$arr_friend['name'] = $content[0]->name;
-		$arr_friend['screen_name'] = $content[0]->screen_name;
-		$arr_friend['location'] = $content[0]->location;
-		$arr_friend['url'] = $content[0]->url;
-		$arr_friend['description'] = $content[0]->description;
-		$arr_friend['followers_count'] = $content[0]->followers_count;
-		$arr_friend['friends_count'] = $content[0]->friends_count;
-		$arr_friend['listed_count'] = $content[0]->listed_count;
-		$arr_friend['favourites_count'] = $content[0]->favourites_count;
-		$arr_friend['lang'] = $content[0]->lang;
-		$arr_friend['profile_image_url'] = $content[0]->profile_image_url;
-		$arr_friend['following'] = $content[0]->following;
-		$arr_friend['last_tweet'] = $content[0]->status->created_at;		
-
-		unset($connection);
+		
 
 		return $arr_friend;
 	}
@@ -195,8 +203,9 @@ class Twitter
 
 	/*
 	 * Return list of Ids' followers
+	 * https://dev.twitter.com/docs/api/1.1/get/followers/ids
 	*/
-	public function followersIds($account)
+	private function followersIds($account)
 	{
 		$connection = new TwitterOAuth($this->consumer_key, $this->consumer_secret, $this->oauth_token, $this->oauth_token_secret);
 
@@ -212,6 +221,17 @@ class Twitter
 		}
 
 		return $arr_ids;
+	}
+
+
+
+	/*
+	 * Convert twitter date (ex : Sat Aug 23 03:57:16 +0000 2014) into timestamp
+	*/
+	private function twitterDateToTimestamp($date)
+	{
+		$arr_date = date_parse($date);
+		return mktime($arr_date['hour'], $arr_date['minute'], $arr_date['second'], $arr_date['month'], $arr_date['day'], $arr_date['year']);
 	}
 
 }
