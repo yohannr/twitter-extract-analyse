@@ -17,4 +17,4 @@ Twitter processing library : extract & analyse data from an account : friends, f
 - because of twitter rate limit, once 150 requests the process is paused.
 For this reason, this script is not recommended for account with high number of friends/followers and will be likely execute throught PHP CLI
 
-- Define in a config file all the twitter keys : CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_TOKEN_SECRET
+- Define in a config file all the twitter keys (CONSUMER_KEY, CONSUMER_SECRET, OAUTH_TOKEN, OAUTH_TOKEN_SECRET) and the account name (TWEETER_NAME)
