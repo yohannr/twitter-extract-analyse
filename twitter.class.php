@@ -39,29 +39,32 @@ class Twitter
 	 * Return the last (10) tweets of an account
 	 * https://dev.twitter.com/docs/api/1.1/get/statuses/user_timeline
 	*/
-	public function statusesUserTimeline($account, $nbOfTweet = 10)
+	public function statusesUserTimeline($account, $nbOfTweet = 10, $returnall = true)
 	{
 		$connection = new TwitterOAuth($this->consumer_key, $this->consumer_secret, $this->oauth_token, $this->oauth_token_secret);
 			
 		$screen_name = 'screen_name='.$account;
 		$count = 'count='.$nbOfTweet;
-		$query = 'https://api.twitter.com/1.1/statuses/user_timeline.json?trim_user=true&exclude_replies=true&'.$screen_name.'&'.$count;
+		$query = 'https://api.twitter.com/1.1/statuses/user_timeline.json?trim_user=true&exclude_replies=true&'.$screen_name.'&'.$count.'&include_entities=false';
 		$content = $connection->get($query);
 
 		$arr_tweets = array();
 
 		$i = 0;
 		foreach ($content as $tweet) {
-			$arr_tweets[$i]['created_at'] = $this->twitterDateToTimestamp($tweet->created_at);
-			$arr_tweets[$i]['id_str'] = $tweet->id_str;
 			$arr_tweets[$i]['text'] = $tweet->text;
-			$arr_tweets[$i]['retweet_count'] = $tweet->retweet_count;
-			$arr_tweets[$i]['favorite_count'] = $tweet->favorite_count;
-			$arr_tweets[$i]['retweeted'] = $tweet->retweeted;
-			$arr_tweets[$i]['possibly_sensitive'] = $tweet->possibly_sensitive;
-			$arr_tweets[$i]['lang'] = $tweet->lang;
-			$arr_tweets[$i]['geo'] = $tweet->geo;
-			$arr_tweets[$i]['place'] = $tweet->place;
+			if ($returnall) {
+				$arr_tweets[$i]['id_str'] = $tweet->id_str;
+				$arr_tweets[$i]['created_at'] = $this->twitterDateToTimestamp($tweet->created_at);
+				$arr_tweets[$i]['retweet_count'] = $tweet->retweet_count;
+				$arr_tweets[$i]['favorite_count'] = $tweet->favorite_count;
+				$arr_tweets[$i]['retweeted'] = $tweet->retweeted;
+				$arr_tweets[$i]['possibly_sensitive'] = $tweet->possibly_sensitive;
+				$arr_tweets[$i]['lang'] = $tweet->lang;
+				$arr_tweets[$i]['geo'] = $tweet->geo;
+				$arr_tweets[$i]['place'] = $tweet->place;
+				$arr_tweets[$i]['source'] = $tweet->source;
+			}
 
 			++$i;
 		}
@@ -90,7 +93,7 @@ class Twitter
 			$fullquery = $query.$id.'&include_entities=false';
 			$content = $connection->get($fullquery);
 
-			$arr_friend['id'] = (int)$content[0]->id_str;
+			$arr_friend['id'] = $content[0]->id_str;
 			$arr_friend['name'] = $content[0]->name;
 			$arr_friend['screen_name'] = $content[0]->screen_name;
 			$arr_friend['location'] = $content[0]->location;
@@ -102,7 +105,7 @@ class Twitter
 			$arr_friend['favourites_count'] = $content[0]->favourites_count;
 			$arr_friend['lang'] = $content[0]->lang;
 			$arr_friend['profile_image_url'] = $content[0]->profile_image_url;
-			$arr_friend['following'] = $content[0]->following;
+			$arr_friend['following'] = $content[0]->following;	// indicate if current account (regarding keys) is following this account
 			$arr_friend['last_tweet'] = $this->twitterDateToTimestamp($content[0]->status->created_at);
 
 		unset($connection);
@@ -152,16 +155,22 @@ class Twitter
 	/*
 	 * Get friends list
 	*/
-	public function friendsList($tweeter_name)
+	public function friendsList($tweeter_name, $limit = 0)
 	{
 
 		$arr_ids = $this->friendsIds($tweeter_name);
-		$i = 0;
-		foreach ($arr_ids as $id) {
+
+		if ($limit == 0) {
+			$limit = sizeof($arr_ids);
+		}
+
+		for ($i=0; $i < $limit; $i++) { 
+			$id = $arr_ids[$i];
+			$arr_friends[] = $this->usersLookup($id);
+
 			++$i;
 			echo 'Friend '.$i.' : Id '.$id;
 			echo "\n";
-			$arr_friends[] = $this->usersLookup($id);
 
 			if (($i % 150) == 0) {
 				echo 'Pause 15min';
@@ -178,10 +187,32 @@ class Twitter
 	/*
 	 * Get followers list
 	*/
-	public function followersList($tweeter_name)
+	public function followersList($tweeter_name, $limit = 0)
 	{
 
 		$arr_ids = $this->followersIds($tweeter_name);
+
+		if ($limit == 0) {
+			$limit = sizeof($arr_ids);
+		}
+
+		for ($i=0; $i < $limit; $i++) { 
+			$id = $arr_ids[$i];
+			$arr_followers[] = $this->usersLookup($id);
+
+			++$i;
+			echo 'Follower '.$i.' : Id '.$id;
+			echo "\n";
+
+			if (($i % 150) == 0) {
+				echo 'Pause 15min';
+				echo "\n";
+				usleep(900000000);
+			}
+		}
+
+
+		/*
 		$i = 0;
 		foreach ($arr_ids as $id) {
 			++$i;
@@ -195,6 +226,7 @@ class Twitter
 				usleep(900000000);
 			}
 		}
+		*/
 
 		return $arr_followers;
 
@@ -233,5 +265,71 @@ class Twitter
 		$arr_date = date_parse($date);
 		return mktime($arr_date['hour'], $arr_date['minute'], $arr_date['second'], $arr_date['month'], $arr_date['day'], $arr_date['year']);
 	}
+
+
+	/*
+	 * Regarding friends, return those who don't enough tweet
+	*/
+	public function getFriendsWhoDontEnoughTweet($delay, $arr_friends)
+	{
+		$arr_remove = array();
+
+		foreach ($arr_friends as $friend) {
+			$duration = time() - $friend['last_tweet'];
+			$duration = round($duration/3600/24);
+
+			if ($duration > 30) {
+				$arr_remove[] = $friend['screen_name'];
+			}
+		}
+
+		return $arr_remove;
+	}
+
+
+	/*
+	 * Return friends who don't follow "you"
+	*/
+	public function getFriendsWhoDontFollow($account, $limit = 0)
+	{
+		$arr_remove = array();
+
+		$arr_friends = $this->friendsIds($account);
+		$arr_followers = $this->followersIds($account);
+
+		$arr_ids = array();
+		$arr_ids = array_diff($arr_friends,$arr_followers);
+
+
+		$i = 0;
+		foreach ($arr_ids as $id) {
+			++$i;
+
+			// Get username and the 10 last tweets
+			// et arriver a qqch comme array('0' => array('screename' => value, 'tweets' => array())...
+			//array_push($arr_remove, )
+			$result = $this->usersLookup($id);
+			$screename = $result['screen_name'];
+			unset($result);
+
+			echo 'Account : '.$screename;
+			echo "\n";
+
+			array_push($arr_remove, array('user' => $screename,
+										'tweets' => $this->statusesUserTimeline($screename, 8, false)
+						));
+
+			if (($i % 150) == 0) {
+				echo 'Pause 15min';
+				echo "\n";
+				usleep(900000000);
+			}
+		}
+		
+
+		return $arr_remove;
+
+	}
+
 
 }
