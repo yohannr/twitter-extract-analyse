@@ -14,6 +14,10 @@ class Twitter
 	private $oauth_token;
 	private $oauth_token_secret;
 	
+
+	/*
+	 * Initialize access
+	*/
 	public function __construct($consumer_key, $consumer_secret, $oauth_token, $oauth_token_secret)
 	{
 		$this->consumer_key = $consumer_key;
@@ -24,7 +28,7 @@ class Twitter
 
 
 	/*
-	 * 
+	 * Return result of a dedicated query
 	*/
 	public function query($query)
 	{
@@ -35,10 +39,13 @@ class Twitter
 	}
 
 
-	/*
+	/**
 	 * Return the last (10) tweets of an account
 	 * https://dev.twitter.com/docs/api/1.1/get/statuses/user_timeline
-	*/
+	 * @param string 	$account
+	 * @param integer 	$nbOfTweet 	Number of tweets to return
+	 * @param booean 	$returnall 	If true, return all information about a tweet
+	 */
 	public function statusesUserTimeline($account, $nbOfTweet = 10, $returnall = true)
 	{
 		$connection = new TwitterOAuth($this->consumer_key, $this->consumer_secret, $this->oauth_token, $this->oauth_token_secret);
@@ -83,7 +90,7 @@ class Twitter
 			$connection = new TwitterOAuth($this->consumer_key, $this->consumer_secret, $this->oauth_token, $this->oauth_token_secret);
 		} catch (Exception $e) {
 			echo 'Error connection usersLookup : '.$e->getMessage();
-			exit;
+			return false;
 		}
 
 		$arr_friend = array();
@@ -111,20 +118,18 @@ class Twitter
 		unset($connection);
 		} catch (Exception $e) {
 			echo 'Error usersLookup : '.$e->getMessage();
-			exit;
+			return false;
 		}
-
-		
 
 		return $arr_friend;
 	}
 
 
 	/*
-	 * Return list of Ids' friends
+	 * Return list of Ids' friends regarding an account
 	 * https://dev.twitter.com/docs/api/1.1/get/friends/ids
 	*/
-	private function friendsIds($tweeter_name)
+	private function friendsIds($account)
 	{
 		try {
 			$connection = new TwitterOAuth($this->consumer_key, $this->consumer_secret, $this->oauth_token, $this->oauth_token_secret);
@@ -135,7 +140,7 @@ class Twitter
 
 		$arr_ids = array();
 		try {
-			$query = 'https://api.twitter.com/1.1/friends/ids.json?screen_name='.$tweeter_name.'&cursor=-1';
+			$query = 'https://api.twitter.com/1.1/friends/ids.json?screen_name='.$account.'&cursor=-1';
 			$content = $connection->get($query);
 			if(!empty($content->ids)) { 
 				foreach($content->ids as $id) {
@@ -152,13 +157,15 @@ class Twitter
 	}
 
 
-	/*
-	 * Get friends list
-	*/
-	public function friendsList($tweeter_name, $limit = 0)
+	/**
+	 * Get friends list regarding an account
+	 * @param 	string 		$account
+	 * @param 	integer 	$limit 	Number of result to return (0 = all)
+	 */
+	public function friendsList($account, $limit = 0)
 	{
 
-		$arr_ids = $this->friendsIds($tweeter_name);
+		$arr_ids = $this->friendsIds($account);
 
 		if ($limit == 0) {
 			$limit = sizeof($arr_ids);
@@ -184,13 +191,15 @@ class Twitter
 	}
 
 
-	/*
-	 * Get followers list
-	*/
-	public function followersList($tweeter_name, $limit = 0)
+	/**
+	 * Get followers list regarding an account
+	 * @param 	string 		$account
+	 * @param 	integer 	$limit 	Number of result to return (0 = all)
+	 */
+	public function followersList($account, $limit = 0)
 	{
 
-		$arr_ids = $this->followersIds($tweeter_name);
+		$arr_ids = $this->followersIds($account);
 
 		if ($limit == 0) {
 			$limit = sizeof($arr_ids);
@@ -210,23 +219,6 @@ class Twitter
 				usleep(900000000);
 			}
 		}
-
-
-		/*
-		$i = 0;
-		foreach ($arr_ids as $id) {
-			++$i;
-			echo 'Followers '.$i.' : Id '.$id;
-			echo "\n";
-			$arr_followers[] = $this->usersLookup($id);
-
-			if (($i % 150) == 0) {
-				echo 'Pause 15min';
-				echo "\n";
-				usleep(900000000);
-			}
-		}
-		*/
 
 		return $arr_followers;
 
@@ -267,10 +259,12 @@ class Twitter
 	}
 
 
-	/*
+	/**
 	 * Regarding friends, return those who don't enough tweet
-	*/
-	public function getFriendsWhoDontEnoughTweet($delay, $arr_friends)
+	 * @param 	array 		$arr_friends 	Array of friends
+	 * @param 	integer 	$delay 			Number of days	
+	 */
+	public function getFriendsWhoDontEnoughTweet($arr_friends, $delay = 30)
 	{
 		$arr_remove = array();
 
@@ -278,7 +272,7 @@ class Twitter
 			$duration = time() - $friend['last_tweet'];
 			$duration = round($duration/3600/24);
 
-			if ($duration > 30) {
+			if ($duration > $delay) {
 				$arr_remove[] = $friend['screen_name'];
 			}
 		}
@@ -290,7 +284,7 @@ class Twitter
 	/*
 	 * Return friends who don't follow "you"
 	*/
-	public function getFriendsWhoDontFollow($account, $limit = 0)
+	public function getFriendsWhoDontFollow($account)
 	{
 		$arr_remove = array();
 
@@ -306,8 +300,6 @@ class Twitter
 			++$i;
 
 			// Get username and the 10 last tweets
-			// et arriver a qqch comme array('0' => array('screename' => value, 'tweets' => array())...
-			//array_push($arr_remove, )
 			$result = $this->usersLookup($id);
 			$screename = $result['screen_name'];
 			unset($result);
@@ -325,7 +317,6 @@ class Twitter
 				usleep(900000000);
 			}
 		}
-		
 
 		return $arr_remove;
 
